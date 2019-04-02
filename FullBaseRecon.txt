@@ -1,0 +1,361 @@
+------------------------- FULLBASE --------------------------------------
+
+drop table  ITEM_FULLBASE_RECON;
+CREATE TABLE ITEM_FULLBASE_RECON 
+   (ENTITY VARCHAR2(20 BYTE), 
+	SOURCE_BSCS NUMBER, 
+	POST_VALID NUMBER, 
+	INTERIM NUMBER, 
+	TARGET NUMBER, 
+	DIFF VARCHAR2(400 BYTE)
+   );
+   
+   
+   ---MSISDN
+Insert into ITEM_FULLBASE_RECON 
+values ('MSISDN_COUNT',(select count(distinct MSISDN) from STG_SERVICES@eoc2bscs),
+(select /*+ parallel (8) */ count(*) as MSIDSN_COUNT from (select distinct MSISDN from ST_EOC_ATTR_COLS)),
+(select /*+ parallel 8 */ count(distinct msisdn) from ST_EOC_ITEM_ALL),
+(select /*+ parallel 8 */ count(*) FROM eoc.CWT_SR_RESOURCE where SERIALNUMBER IS NOT NULL),'');
+commit;
+
+---CONTRACT_ID
+Insert into ITEM_FULLBASE_RECON 
+values ('CONTRACT_COUNT',(select count(distinct CONT_ID) from STG_CONTRACTS@eoc2bscs),
+(select /*+ parallel 8 */ count(distinct CONT_ID) from ST_EOC_ATTR_COLS),
+(select /*+ parallel 8 */ count(distinct co_id) from ST_EOC_ITEM_ALL),
+(select /*+ parallel 16 */ count(distinct ENTITYDN) from eoc.CWT_SR_ASSOCIATION WHERE 
+APPLICATIONCONTEXT = 'RelatedExtEntity' AND ENTITYTYPE = 'Contract'),'');
+commit;
+
+
+---EQUIP_ID
+Insert into ITEM_FULLBASE_RECON 
+values ('EQUIP_COUNT',(select count(distinct EQUIP_ID) from STG_SERVICES@eoc2bscs),
+(select count(distinct EQUIP_ID) from ST_EOC_ATTR_COLS),
+(select /*+ parallel 8 */  count(distinct LEGACYPLANID) from ST_EOC_ITEM_ALL),
+'','');
+commit;
+
+---PO_ID
+select * from st_eoc_item_po;
+Insert into ITEM_FULLBASE_RECON 
+values ('PO_COUNT','',
+(select /*+ parallel 8 */ count(distinct s.CO_ID|| '-' ||s.EQUIP_ID|| '-' ||e.PO_ID) as poCnt from ST_EOC_ATTR_COLS s, EQUIP_PO_MASTER e
+where s.EQUIP_ID=e.EQUIP_ID
+and s.LINE_TYPE=e.LINE_TYPE),
+(select /*+ parallel 16 */ count(distinct CO_ID|| '-' ||LEGACYPLANID|| '-' ||po_id) from st_eoc_item_po),
+(select /*+ parallel 16 */ count(distinct CO_ID|| '-' ||LEGACYPLANID|| '-' ||ITEMCODE) from ST_EOC_ITEM_ALL),'');
+commit;
+
+
+--- Customer
+select * from ST_EOC_ITEM_ALL;
+Insert into ITEM_FULLBASE_RECON 
+values ('CUSTOMER_COUNT',(select count(distinct CUST_ID) from STG_CUSTOMERS@eoc2bscs),
+(select count(distinct CUST_ID) from ST_EOC_ATTR_COLS),
+(select /*+ parallel 8 */  count(distinct ENTITY_ID) from ST_EOC_ITEM_ALL),
+(select /*+ parallel 8 */ count(distinct ENTITYDN) from eoc.CWT_SR_ASSOCIATION WHERE 
+APPLICATIONCONTEXT = 'RelatedParty' AND ENTITYTYPE = 'Customer'),'');
+commit;
+
+--Diff
+update ITEM_FULLBASE_RECON set  diff=source_bscs-interim where ENTITY IN ('MSISDN_COUNT','CONTRACT_COUNT','EQUIP_COUNT','CUSTOMER_COUNT','NEWENTITY_CUSTOMER');
+commit;
+
+update ITEM_FULLBASE_RECON set  diff=POST_VALID-target where ENTITY='PO_COUNT';
+commit;
+
+
+
+--------------------------------- FULLBASE REMARKS============
+drop table ITEM_FULLBASE_RECON_REMARKS;
+ CREATE TABLE ITEM_FULLBASE_RECON_REMARKS 
+  (ENTITY VARCHAR2(20 BYTE), 
+	REMARKS VARCHAR2(4000 BYTE), 
+	COUNT VARCHAR2(32 BYTE)
+  );
+  
+---EQUIP_PO_MASTER_E
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+select 'EQUIP_PO_MASTER_E' , reason, count(*)  from EQUIP_PO_MASTER_E group by reason;
+commit;
+
+---ST_EOC_ATTR_COLS_E
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+select 'ST_EOC_ATTR_COLS_E' , reason, count(*)  from st_eoc_attr_cols_e group by reason;
+commit;
+
+---ST_EOC_ITEM_PO_E
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+select 'ST_EOC_ITEM_PO_E' , reason, count(*)  from ST_EOC_ITEM_PO_E group by reason;
+commit;
+
+  
+  --msisdn
+  Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('MSISDN_COUNT','Contracts having more than 1 Main Equip ID',
+(select count(distinct msisdn) from st_eoc_attr_cols_e where reason ='Contracts having more than 1 Main Equip ID'));
+commit;
+
+--contracts
+--Insert into ITEM_FULLBASE_RECON_REMARKS 
+--values ('CONTRACT_COUNT','Total rejection in EQUIP_PO_MASTER_E',
+--(select count(distinct cont_id) from EQUIP_PO_MASTER_E where cont_id NOT IN (select /*+ parallel (16) */ distinct cont_id from ST_EOC_ATTR_COLS)));
+--commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CONTRACT_COUNT','Total rejection in ST_EOC_ATTR_COLS_E',
+(select count(distinct cont_id) from ST_EOC_ATTR_COLS_E where cont_id NOT IN (select /*+ parallel (16) */ distinct cont_id from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CONTRACT_COUNT','Total rejection in ST_EOC_ITEM_PO_E',
+(select count(distinct cont_id) from ST_EOC_ITEM_PO_E where cont_id NOT IN (select /*+ parallel (16) */ distinct cont_id from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CONTRACT_COUNT','Disconnected/Terminated Contracts',
+(select count(distinct cont_id) from ST_EOC_ATTR_COLS_E where reason='Disconnected/Terminated Contracts'));
+commit;
+
+  Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CONTRACT_COUNT','Contract mapped to different Customers',
+(select count(distinct cont_id) from st_eoc_attr_cols_e where reason ='Contract mapped to different Customers'));
+commit;
+
+ Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CONTRACT_COUNT','MSISDN mapped to different Contracts',
+(select count(distinct cont_id) from st_eoc_attr_cols_e where reason ='MSISDN mapped to different Contracts'));
+commit;
+
+ Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CONTRACT_COUNT','Contracts having more than 1 Main Equip ID',
+(select count(distinct cont_id) from st_eoc_attr_cols_e where reason ='Contracts having more than 1 Main Equip ID'));
+commit;
+
+
+ Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CONTRACT_COUNT','Equip ID Missing for Contract',
+(select count(distinct cont_id) from st_eoc_attr_cols_e where reason ='Equip ID Missing for Contract'));
+commit;
+
+ Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CONTRACT_COUNT','CRM specific Equip Ids not applicable for EOC',
+(select count(distinct cont_id) from st_eoc_attr_cols_e where reason ='CRM specific Equip Ids not applicable for EOC'
+and cont_id not IN (select /*+ parallel (32) */ distinct cont_id from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CONTRACT_COUNT','Equip Ids not in EQUIP_PO_MASTER',
+(select count(distinct cont_id) from st_eoc_attr_cols_e where reason ='Equip Ids not in EQUIP_PO_MASTER'
+and cont_id not IN (select /*+ parallel (32) */ distinct cont_id from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CONTRACT_COUNT','EQUIP_ID, LINE_TYPE and CUST_CLASS in ST_EOC_ATTR_COLS not in EQUIP_PO_MASTER',
+(select count(distinct cont_id) from st_eoc_attr_cols_e where reason ='EQUIP_ID, LINE_TYPE and CUST_CLASS in ST_EOC_ATTR_COLS not in EQUIP_PO_MASTER'
+and cont_id not IN (select /*+ parallel (32) */ distinct cont_id from ST_EOC_ATTR_COLS)));
+commit;
+
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CONTRACT_COUNT','EQUIP_ID, LINETYPE in ST_EOC_ATTR_COLS not in EQUIP_PO_MASTER',
+(select count(distinct cont_id) from st_eoc_attr_cols_e where reason ='EQUIP_ID, LINETYPE in ST_EOC_ATTR_COLS not in EQUIP_PO_MASTER'
+and cont_id not IN (select /*+ parallel (32) */ distinct cont_id from ST_EOC_ATTR_COLS)));
+commit;
+
+
+--equipid
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','Total rejection in EQUIP_PO_MASTER_E',
+(select count(distinct EQUIP_ID) from EQUIP_PO_MASTER_E where EQUIP_ID NOT IN (select /*+ parallel (16) */ distinct EQUIP_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','Total rejection in ST_EOC_ATTR_COLS_E',
+(select count(distinct EQUIP_ID) from ST_EOC_ATTR_COLS_E where EQUIP_ID NOT IN (select /*+ parallel (16) */ distinct EQUIP_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','Total rejection in ST_EOC_ITEM_PO_E',
+(select count(distinct EQUIP_ID) from ST_EOC_ITEM_PO_E where EQUIP_ID NOT IN (select /*+ parallel (16) */ distinct EQUIP_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+ Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','Contracts having more than 1 Main Equip ID',
+(select count(distinct cont_id|| '-' ||EQUIP_ID) from st_eoc_attr_cols_e where reason='Contracts having more than 1 Main Equip ID'));
+commit;
+
+ Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','Equip Ids that are present in Extracted data (post Common validation) and are not in Equip PO Master',
+(select count(distinct cont_id|| '-' ||EQUIP_ID) from st_eoc_attr_cols_e where reason='Equipments present in ST_EOC_ATTR_COLS but not in EQUIP_ID_PO_TREE_NORM'));
+commit;
+
+ Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','PO_ID not in ECM.CWPC_ITEM',
+(select count(distinct EQUIP_ID) from EQUIP_PO_MASTER_E where reason='PO_ID not in ECM.CWPC_ITEM'));
+commit;
+
+ Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','Basic PO_ID not in CWPC_ITEMATTRIBUTE_V',
+(select count(distinct EQUIP_ID) from EQUIP_PO_MASTER_E where reason='Basic PO_ID not in CWPC_ITEMATTRIBUTE_V'));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','Addon or Optional defined as Basic in CWPC_ITEMATTRIBUTE_V',
+(select count(distinct EQUIP_ID) from EQUIP_PO_MASTER_E where reason='Addon or Optional defined as Basic in CWPC_ITEMATTRIBUTE_V'));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','Disconnected/Terminated Contracts',
+(select count(distinct EQUIP_ID) from ST_EOC_ATTR_COLS_E where reason='Disconnected/Terminated Contracts' and 
+EQUIP_ID not IN (select /*+ parallel (32) */ distinct EQUIP_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','Contract mapped to different Customers',
+(select count(distinct EQUIP_ID) from ST_EOC_ATTR_COLS_E where reason='Contract mapped to different Customers' and 
+EQUIP_ID not IN (select /*+ parallel (32) */ distinct EQUIP_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','MSISDN mapped to different Contracts',
+(select count(distinct EQUIP_ID) from ST_EOC_ATTR_COLS_E where reason='MSISDN mapped to different Contracts' and 
+EQUIP_ID not IN (select /*+ parallel (32) */ distinct EQUIP_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','CRM specific Equip Ids not applicable for EOC',
+(select count(distinct EQUIP_ID) from ST_EOC_ATTR_COLS_E where reason='CRM specific Equip Ids not applicable for EOC' and 
+EQUIP_ID not IN (select /*+ parallel (32) */ distinct EQUIP_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','Equip Ids not in EQUIP_PO_MASTER',
+(select count(distinct EQUIP_ID) from ST_EOC_ATTR_COLS_E where reason='Equip Ids not in EQUIP_PO_MASTER' and 
+EQUIP_ID not IN (select /*+ parallel (32) */ distinct EQUIP_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','EQUIP_ID, LINE_TYPE and CUST_CLASS in ST_EOC_ATTR_COLS not in EQUIP_PO_MASTER',
+(select count(distinct EQUIP_ID) from ST_EOC_ATTR_COLS_E where reason='EQUIP_ID, LINE_TYPE and CUST_CLASS in ST_EOC_ATTR_COLS not in EQUIP_PO_MASTER' and 
+EQUIP_ID not IN (select /*+ parallel (32) */ distinct EQUIP_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','EQUIP_ID, LINETYPE in ST_EOC_ATTR_COLS not in EQUIP_PO_MASTER',
+(select count(distinct EQUIP_ID) from ST_EOC_ATTR_COLS_E where reason='EQUIP_ID, LINETYPE in ST_EOC_ATTR_COLS not in EQUIP_PO_MASTER' and 
+EQUIP_ID not IN (select /*+ parallel (32) */ distinct EQUIP_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('EQUIP_COUNT','Discontinued Contracts',
+(select count(distinct EQUIP_ID) from ST_EOC_ATTR_COLS_E where reason='Discontinued Contracts' and 
+EQUIP_ID not IN (select /*+ parallel (32) */ distinct EQUIP_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+
+
+----po_id
+ Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('PO_COUNT','Invalid Parent-Child PO Combination',
+(select count(distinct CO_ID|| '-' ||EQUIP_ID|| '-' ||PO_ID) as poCount from ST_EOC_ITEM_PO_E where reason='Invalid Parent-Child PO Combination'));
+commit;
+
+--customer
+--Insert into ITEM_FULLBASE_RECON_REMARKS 
+--values ('CUSTOMER_COUNT','Total rejection in EQUIP_PO_MASTER_E',
+--(select count(distinct cust_id) from EQUIP_PO_MASTER_E where cust_id NOT IN (select /*+ parallel (16) */ distinct cust_id from ST_EOC_ATTR_COLS)));
+--commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CUSTOMER_COUNT','Total rejection in ST_EOC_ATTR_COLS_E',
+(select /*+ parallel (8) */ count(distinct cust_id) from ST_EOC_ATTR_COLS_E where cust_id NOT IN (select /*+ parallel (16) */ distinct cust_id from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CUSTOMER_COUNT','Total rejection in ST_EOC_ITEM_PO_E',
+(select count(distinct cust_id) from ST_EOC_ITEM_PO_E where cust_id NOT IN (select /*+ parallel (16) */ distinct cust_id from ST_EOC_ATTR_COLS)));
+commit;
+
+
+ Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CUSTOMER_COUNT','Customers without Contracts',
+(select count(distinct cust_id) from st_eoc_attr_cols_e where reason='Customers without Contracts'));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CUSTOMER_COUNT','Disconnected/Terminated Contracts',
+(select count(distinct cust_id) from ST_EOC_ATTR_COLS_E where reason='Disconnected/Terminated Contracts' and 
+CUST_ID not IN (select /*+ parallel (32) */ distinct CUST_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CUSTOMER_COUNT','Contract mapped to different Customers',
+(select count(distinct cust_id) from ST_EOC_ATTR_COLS_E where reason='Contract mapped to different Customers' and 
+CUST_ID not IN (select /*+ parallel (32) */ distinct CUST_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CUSTOMER_COUNT','MSISDN mapped to different Contracts',
+(select count(distinct cust_id) from ST_EOC_ATTR_COLS_E where reason='MSISDN mapped to different Contracts' and 
+CUST_ID not IN (select /*+ parallel (32) */ distinct CUST_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CUSTOMER_COUNT','Equip ID Missing for Contract',
+(select count(distinct cust_id) from ST_EOC_ATTR_COLS_E where reason='Equip ID Missing for Contract' and 
+CUST_ID not IN (select /*+ parallel (32) */ distinct CUST_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CUSTOMER_COUNT','CRM specific Equip Ids not applicable for EOC',
+(select count(distinct cust_id) from ST_EOC_ATTR_COLS_E where reason='CRM specific Equip Ids not applicable for EOC' and 
+CUST_ID not IN (select /*+ parallel (32) */ distinct CUST_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CUSTOMER_COUNT','Equip Ids not in EQUIP_PO_MASTER',
+(select count(distinct cust_id) from ST_EOC_ATTR_COLS_E where reason='Equip Ids not in EQUIP_PO_MASTER' and 
+CUST_ID not IN (select /*+ parallel (32) */ distinct CUST_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CUSTOMER_COUNT','Discontinued Contracts',
+(select count(distinct cust_id) from ST_EOC_ATTR_COLS_E where reason='Discontinued Contracts' and 
+CUST_ID not IN (select /*+ parallel (32) */ distinct CUST_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CUSTOMER_COUNT','CRM specific Equip Ids not applicable for EOC',
+(select count(distinct cust_id) from ST_EOC_ATTR_COLS_E where reason='CRM specific Equip Ids not applicable for EOC' and 
+CUST_ID not IN (select /*+ parallel (32) */ distinct CUST_ID from ST_EOC_ATTR_COLS)
+and cust_id NOT IN (select distinct cust_id from ST_EOC_ATTR_COLS_E where reason!='CRM specific Equip Ids not applicable for EOC')));
+commit;
+
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CUSTOMER_COUNT','EQUIP_ID, LINE_TYPE and CUST_CLASS in ST_EOC_ATTR_COLS not in EQUIP_PO_MASTER',
+(select count(distinct cust_id) from ST_EOC_ATTR_COLS_E where reason='EQUIP_ID, LINE_TYPE and CUST_CLASS in ST_EOC_ATTR_COLS not in EQUIP_PO_MASTER' and 
+CUST_ID not IN (select /*+ parallel (32) */ distinct CUST_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+Insert into ITEM_FULLBASE_RECON_REMARKS 
+values ('CUSTOMER_COUNT','EQUIP_ID, LINETYPE in ST_EOC_ATTR_COLS not in EQUIP_PO_MASTER',
+(select count(distinct cust_id) from ST_EOC_ATTR_COLS_E where reason='EQUIP_ID, LINETYPE in ST_EOC_ATTR_COLS not in EQUIP_PO_MASTER' and 
+CUST_ID not IN (select /*+ parallel (32) */ distinct CUST_ID from ST_EOC_ATTR_COLS)));
+commit;
+
+
+--delete from ITEM_FULLBASE_RECON_REMARKS where COUNT='0';
+
+---select sum(count) from ITEM_FULLBASE_RECON_REMARKS where ENTITY='CUSTOMER_COUNT';
+
