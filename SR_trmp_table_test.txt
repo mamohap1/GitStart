@@ -1,0 +1,71 @@
+select * from ST_EOC_ITEM_ASSOC_PO_1;
+
+select * from CWT_SR_ENTITY; --0
+select * from CWT_SR_ENTITYACT; --0
+select * from CWT_SR_ASSOCIATION; --0
+select * from CWT_SR_ASSOCIATIONACT; --0
+select * from CWT_SR_PRODUCT; --0
+select * from CWT_SR_PRODPRICE; --0
+select * from CWT_SR_RESOURCE; --0
+select * from CWT_SR_SERVICE; --0
+select * from CWT_SR_CONTEXTDATA; --0
+select * from CWT_SR_CUR_VERSION; --0
+
+create table CWT_SR_ENTITY_TMP as select * from CWT_SR_ENTITY where 1>2;
+create table CWT_SR_ENTITYACT_TMP as select * from CWT_SR_ENTITYACT where 1>2;
+create table CWT_SR_ASSOCIATION_TMP as select * from CWT_SR_ASSOCIATION where 1>2;
+create table CWT_SR_ASSOCIATIONACT_TMP as select * from CWT_SR_ENTITY where 1>2;
+create table CWT_SR_PRODUCT_TMP as select * from CWT_SR_PRODUCT where 1>2;
+create table CWT_SR_PRODPRICE_TMP as select * from CWT_SR_PRODPRICE where 1>2;
+create table CWT_SR_RESOURCE_TMP as select * from CWT_SR_RESOURCE where 1>2;
+create table CWT_SR_SERVICE_TMP as select * from CWT_SR_SERVICE where 1>2;
+create table CWT_SR_CONTEXTDATA_TMP as select * from CWT_SR_CONTEXTDATA where 1>2;
+create table CWT_SR_CUR_VERSION_TMP as select * from CWT_SR_CUR_VERSION where 1>2;
+
+select * from user_tables order by LAST_ANALYZED desc;
+
+truncate table CWT_SR_ENTITY_TMP;
+truncate table CWT_SR_ENTITYACT_TMP;
+truncate table CWT_SR_ASSOCIATION_TMP;
+truncate table CWT_SR_ASSOCIATIONACT_TMP;
+truncate table CWT_SR_PRODUCT_TMP;
+truncate table CWT_SR_PRODPRICE_TMP;
+truncate table CWT_SR_RESOURCE_TMP;
+truncate table CWT_SR_SERVICE_TMP;
+truncate table CWT_SR_CONTEXTDATA_TMP;
+truncate table CWT_SR_CUR_VERSION_TMP;
+commit;
+
+select * from CWT_SR_ENTITY_TMP; --0
+select * from CWT_SR_ENTITYACT_TMP; --0
+select * from CWT_SR_ASSOCIATION_TMP; --0
+select * from CWT_SR_ASSOCIATIONACT_TMP; --0
+select * from CWT_SR_PRODUCT_TMP; --0
+select * from CWT_SR_PRODPRICE_TMP; --0
+select * from CWT_SR_RESOURCE_TMP; --0
+select * from CWT_SR_SERVICE_TMP; --0
+select * from CWT_SR_CONTEXTDATA_TMP; --0
+select * from CWT_SR_CUR_VERSION_TMP; --0
+
+select 
+(select count(*) from CWT_SR_ENTITY_TMP) as  CWT_SR_ENTITY_TMP,
+(select count(*) from CWT_SR_ENTITYACT_TMP) as  CWT_SR_ENTITYACT_TMP,
+(select count(*) from CWT_SR_ASSOCIATION_TMP) as  CWT_SR_ASSOCIATION_TMP,
+(select count(*) from CWT_SR_ASSOCIATIONACT_TMP) as  CWT_SR_ASSOCIATIONACT_TMP,
+(select count(*) from CWT_SR_PRODUCT_TMP) as  CWT_SR_PRODUCT_TMP,
+(select count(*) from CWT_SR_PRODPRICE_TMP) as  CWT_SR_PRODPRICE_TMP,
+(select count(*) from CWT_SR_RESOURCE_TMP) as  CWT_SR_RESOURCE_TMP,
+(select count(*) from CWT_SR_SERVICE_TMP) as  CWT_SR_SERVICE_TMP,
+(select count(*) from CWT_SR_CONTEXTDATA_TMP) as  CWT_SR_CONTEXTDATA_TMP,
+(select count(*) from CWT_SR_CUR_VERSION_TMP) as  CWT_SR_CUR_VERSION_TMP
+from dual;
+
+---New Contract TMP insert 1m 20sec
+
+--OPTIN 44 sec
+
+--OPTOUT 19 sec
+
+--Barring 2m 40 sec (check again)
+
+--status update
